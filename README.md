@@ -11,7 +11,7 @@ Software used for study of loss functions with specific aim of accuratley predic
 Python version 3.5+
 Minimal python requirements: numpy, scipy, matplotlib, tensorflow 2, tensorflow-probability, GPy, numba
 
-Dataset generation requires installation of Nek5000 and dependencies.  Run time for Kolmogorov flow simulation is approximately ??? hours on ??? cores and square cylinder is approximately ??? hours on 128 cores.  Mesh generation uses gmsh.
+Dataset generation requires installation of Nek5000 and dependencies.  Run time for Kolmogorov flow simulation is approximately 5 hours on 16 cores and square cylinder is approximately 43.5 hours on 128 cores.  Mesh generation uses gmsh.
 
 License
 ----
