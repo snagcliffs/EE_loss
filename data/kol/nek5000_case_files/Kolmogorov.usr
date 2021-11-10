@@ -1,0 +1,242 @@
+c-----------------------------------------------------------------------
+c
+c  Kolmogorov flow
+c
+c  Changes from base .usr file:
+c     - uservp  : n/a
+c     - userf   : added acceleration (same as forcing since rho=1)
+c     - userq   : n/a
+c     - userbc  : n/a
+c     - useric  : added arbitrary periodic IC
+c     - userchk : write energy/fourier terms to file
+c                 write vorticity to temperature field
+c                 write mass to temperature field on initial timestep
+c     - userqtl : n/a 
+c     - usrdat  : n/a
+c     - usrdat2 : set ifto=true to record temperature field
+c     - usrdat3 : n/a
+c     
+c-----------------------------------------------------------------------
+      subroutine uservp(ix,iy,iz,eg) ! set variable properties
+
+c      implicit none
+
+      integer ix,iy,iz,eg
+     
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      integer e
+c     e = gllel(eg)
+
+      udiff  = 0.0
+      utrans = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine userf(ix,iy,iz,eg) ! set acceleration term
+c
+c     Note: this is an acceleration term, NOT a force!
+c     Thus, ffx will subsequently be multiplied by rho(x,t).
+c
+c      implicit none
+
+      integer ix,iy,iz,eg
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      integer e
+c     e = gllel(eg)
+
+      parameter(nf=4.)
+
+      ffx = sin(nf*y)
+      ffy = 0.0
+      ffz = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine userq(ix,iy,iz,eg) ! set source term
+
+c      implicit none
+
+      integer ix,iy,iz,eg
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      integer e
+c     e = gllel(eg)
+
+      qvol   = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine userbc(ix,iy,iz,iside,eg) ! set up boundary conditions
+c
+c     NOTE ::: This subroutine MAY NOT be called by every process
+c
+c      implicit none
+
+      integer ix,iy,iz,iside,eg
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      ux   = 0.0
+      uy   = 0.0
+      uz   = 0.0
+      temp = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine useric(ix,iy,iz,eg) ! set up initial conditions
+
+c      implicit none
+
+      integer ix,iy,iz,eg
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKUSE'
+
+      ux   = 0.1*cos(y)
+      uy   = 0.1*sin(x)
+      uz   = 0.0
+      temp = 0.0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine userchk()
+
+c      implicit none
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      ifreguo = .true.   ! dump on regular (uniform) grid instead of GLL
+      nrg     = 64       ! dimension of regular grid (nrg**ndim)
+
+c     Only write output every 100th step after frist 100
+      nio = -1
+      if (istep.le.100.or.mod(istep,1000).eq.0) nio=nid
+
+      if (mod(istep,nint(uparam(1))).eq.0) call write_stuff
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine userqtl ! Set thermal divergence
+
+      call userqtl_scig 
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat()   ! This routine to modify element vertices
+
+c      implicit none
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat2()  ! This routine to modify mesh coordinates
+
+c      implicit none
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine usrdat3()
+
+c      implicit none
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      return
+      end
+
+c----------------------------------------------------------------------
+
+      subroutine write_stuff
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      parameter (lt=lx1*ly1*lz1*lelv)
+      common /scrns/ vort(lt,3), w1(lt), w2(lt)
+
+      common /mygrad/ vxx(lt),vxy(lt),vxz(lt)
+     $              , vyx(lt),vyy(lt),vyz(lt)
+
+      real E, D, I, a10, a0f, a1f, a1r, a1i, a2r, a2i
+
+c     Output formats for energy.dat and fourier.dat
+      character(len=60) :: fmt_energy
+      character(len=60) :: fmt_fourier
+      fmt_energy = "(f9.3, TR4, f8.5, TR4, f8.5, TR4, f8.5:)"
+      fmt_fourier = "(f9.3, TR4, f8.5, TR4, f8.5, TR4, f8.5:)"
+
+      n = nx1*ny1*nz1*nelv
+
+      if (istep.eq.0) then
+         open(12, file = 'energy.dat', access = 'append')  
+         open(13, file = 'fourier.dat', access = 'append')  
+      endif 
+
+c     Record history at discrete set of points
+      call hpts()
+
+c     Compute energy, dissipation rate, and input
+c     Note param(2) is viscosity
+      call gradm1(vxx,vxy,vxz,vx) ! gradients of x-vel
+      call gradm1(vyx,vyy,vyz,vy) ! gradients of y-vel
+
+      E = (glsc3(vx,vx,bm1,n)+
+     $     glsc3(vy,vy,bm1,n)) / (2 * voltm1)
+
+      D = (glsc3(vxx,vxx,bm1,n)+
+     $     glsc3(vxy,vxy,bm1,n)+
+     $     glsc3(vyx,vyx,bm1,n)+
+     $     glsc3(vyy,vyy,bm1,n))*param(2) / voltm1
+
+      I = glsc3(vx,Sin(4*ym1),bm1,n) / voltm1
+         
+c     Write to energy.dat
+      write(12, fmt_energy) time, E, D, I
+
+c     Compute Fourier modes.  
+c     See SI of Farazmand and Sapsis. Sci. Adv. 2017
+      a10r = -glsc3(vy,Cos(xm1),bm1,n)/voltm1
+      a10i = -glsc3(vy,Sin(xm1),bm1,n)/voltm1
+      a0fr = glsc3(vx,Cos(4*ym1),bm1,n)/voltm1
+      a0fi = glsc3(vx,Sin(4*ym1),bm1,n)/voltm1 ! = I
+      a1fr = 1.25*glsc3(vx,Cos(xm1+4*ym1),bm1,n)/voltm1
+      a1fi = 1.25*glsc3(vx,Sin(xm1+4*ym1),bm1,n)/voltm1
+
+c     Write magnitudes to fourier.dat
+      write(13, fmt_fourier) time, Sqrt(a10r**2+a10i**2),
+     $                             Sqrt(a0fr**2+a0fi**2),
+     $                             Sqrt(a1fr**2+a1fi**2)
+
+      return
+      end
+
+c----------------------------------------------------------------------

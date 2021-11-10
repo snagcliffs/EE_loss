@@ -1,0 +1,100 @@
+import numpy as np
+import subprocess
+import numba as nb
+
+def write_hist_points(n_hist):
+
+    with open("Kolmogorov.his", "w") as file:
+
+        X = np.linspace(np.pi/n_hist, 2*np.pi-np.pi/n_hist, n_hist)
+
+        file.write(str(n_hist**2) + '\n')
+        for i in range(n_hist):
+            for j in range(n_hist):
+                file.write(str(X[i]) + ' ' + str(X[j]) + ' 0.0 \n')
+
+@nb.jit
+def read_hist_vals(hist, m, n_hist, col):
+
+    vals = np.zeros((m, n_hist**2))
+
+    for i in range(m):
+        for j in range(n_hist**2):
+            vals[i,j] = np.round(hist[i*n_hist**2+j, col],5)
+
+    return vals
+
+def parse_history_points(n_hist):
+    """
+    Takes history file written by nek and converts to individual files;
+    pres_hist.npy --- (m * n_hist) matrix
+    time_hist.npy --- (m * 1)
+    hist_points.npy --- (n_hist * 2)
+    Currently loads everything into memory at one which takes a while.
+    """
+
+    full_hist = np.loadtxt("Kolmogorov.his", skiprows=n_hist**2+1)
+    m = int(full_hist.shape[0]/n_hist**2)
+
+    u_hist = read_hist_vals(full_hist, m, n_hist, 1)
+    v_hist = read_hist_vals(full_hist, m, n_hist, 2)
+    p_hist = read_hist_vals(full_hist, m, n_hist, 3)
+    if full_hist.shape[1] == 5: w_hist = read_hist_vals(full_hist, m, n_hist, 4)
+    time_hist = np.array([full_hist[j*n_hist**2, 0] for j in range(m)])
+
+    np.save('time_hist', time_hist)
+    np.save('u_hist', u_hist)
+    np.save('v_hist', v_hist)
+    np.save('pres_hist', p_hist)
+    if full_hist.shape[1] == 5: np.save('vort_hist', w_hist)
+
+    with open("Kolmogorov.his", "r+") as file:
+        lines = file.readlines()
+        file.seek(0)
+        for j in range(n_hist**2):
+            file.write(lines[j+1])
+        file.truncate()
+    subprocess.run("mv Kolmogorov.his hist_points.dat", shell=True)
+
+def write_par_files(T,dt,dT,Re,hist_freq):
+    """
+    Write .par file for each of the two meshes
+
+    userParam01 is used by pitch.usr to determine which mesh is being used.  This helps with writing the mass matrices
+    forceCoeffs.dat
+    """
+
+    par_lines = ['#',\
+                 '# nek parameter file',\
+                 '#',\
+                 '',\
+                 '[GENERAL]',\
+                 'stopAt = endTime',\
+                 'endTime = '+str(T),\
+                 'dt = '+str(dt),\
+                 'variableDt = no',\
+                 '',\
+                 'targetCFL = 0.5',\
+                 'timeStepper = BDF2',\
+                 'writeControl = runTime',\
+                 'writeInterval = '+str(dT),\
+                 'dealiasing = yes',\
+                 'userParam01 = '+str(int(hist_freq)),\
+                 '',\
+                 '[PROBLEMTYPE]',\
+                 'equation = incompNS',\
+                 '',\
+                 '[PRESSURE]',\
+                 'residualTol = 1e-5',\
+                 'residualProj = yes',\
+                 '',\
+                 '[VELOCITY]',\
+                 'residualTol = 1e-5',\
+                 'density = 1.0',\
+                 'viscosity = '+str(1./Re)]
+
+    # Write airfoil.par
+    with open('Kolmogorov.par', 'w') as file:
+        file.seek(0)
+        for line in par_lines: file.write(line+'\n')
+        file.truncate()

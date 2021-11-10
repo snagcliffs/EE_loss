@@ -1,0 +1,12 @@
+-2                     spatial dimension (will create box.re2)
+1                      number of fields
+#
+#    comments: two dimensional periodic domain
+#
+#========================================================
+#
+Box                                       Kolmogorov
+-12 -12                                   Nelx  Nely
+0.0 6.283185 1.                           x0 x1 ratio
+0.0 6.283185 1.                           y0 y1 ratio
+P  ,P  ,P  ,P                             BC's:  (cbx0, cbx1, cby0, cby1)
