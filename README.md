@@ -13,6 +13,10 @@ Minimal python requirements: numpy, scipy, matplotlib, tensorflow 2, tensorflow-
 
 Dataset generation requires installation of Nek5000 and dependencies.  Run time for Kolmogorov flow simulation is approximately 5 hours on 16 cores and square cylinder is approximately 43.5 hours on 128 cores.  Mesh generation uses gmsh.
 
+#### Data Access
+
+Data files are stored using git large file storage.  To download, install git-lfs, clone repository, and use "git-lfs pull".
+
 License
 ----
 MIT
