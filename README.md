@@ -1,4 +1,4 @@
-### Output-weighted and relative entropy loss functions for deep learning precursors of extreme events in fluid flows
+### Output-weighted and relative entropy loss functions for deep learning precursors of extreme events
 
 Samuel H. Rudy and Themistoklis P. Sapsis
 
